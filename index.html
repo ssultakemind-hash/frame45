@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAKEMIND 4:5 여백 변환기</title>
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#fff; --ink:#1d1d1b; --sub:#77746d; --line:#e4e1da;
+    --accent:#1d1d1b; --ok:#2f7a4a; --err:#b3412e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic","Noto Sans KR",sans-serif;
+    -webkit-text-size-adjust:100%}
+  .wrap{max-width:880px;margin:0 auto;padding:22px 16px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:18px}
+  h1{font-size:19px;letter-spacing:.14em;font-weight:600;margin:0}
+  h1 small{display:block;font-size:12px;letter-spacing:0;color:var(--sub);font-weight:400;margin-top:4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  .drop{border:1.5px dashed #c9c5bc;border-radius:12px;padding:28px 14px;text-align:center;cursor:pointer;transition:.15s}
+  .drop.over{background:#efede7;border-color:var(--ink)}
+  .drop b{display:block;font-size:16px;margin-bottom:6px}
+  .drop span{font-size:13px;color:var(--sub)}
+  .row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+  .opt{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .opt label{font-size:12px;color:var(--sub)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{border:0;background:#fff;padding:9px 12px;font-size:13px;color:var(--ink);cursor:pointer;white-space:nowrap}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:var(--ink);color:#fff}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{appearance:none;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:10px;
+    padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn:disabled{opacity:.35;cursor:default}
+  .status{font-size:13px;color:var(--sub);margin-top:10px;min-height:18px}
+  .bar{height:4px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:10px;display:none}
+  .bar i{display:block;height:100%;width:0;background:var(--ink);transition:width .2s}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .item{position:relative;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .item .pv{aspect-ratio:4/5;background:#eee;display:flex;align-items:center;justify-content:center}
+  .item .pv{padding:8px}
+  .item img{width:100%;height:100%;object-fit:contain;display:block;background:#fff;box-shadow:0 0 0 1px #dcd8cf}
+  .item .meta{font-size:11px;color:var(--sub);padding:6px 8px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+  .item .meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .save{border:0;background:none;font-size:11px;color:var(--ink);text-decoration:underline;cursor:pointer;padding:0;flex:none}
+  .item .x{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:0;
+    background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:24px;cursor:pointer;padding:0}
+  .item.err .pv{color:var(--err);font-size:12px;padding:10px;text-align:center}
+  .spin{width:20px;height:20px;border:2px solid #ccc;border-top-color:var(--ink);border-radius:50%;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .tip{font-size:12.5px;color:var(--sub);line-height:1.65}
+  .tip b{color:var(--ink)}
+  .count{font-size:13px;color:var(--sub)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TAKEMIND<small>인스타 4:5 흰 여백 변환기</small></h1>
+    <span class="count" id="count"></span>
+  </header>
+
+  <div class="card">
+    <div class="drop" id="drop">
+      <b>사진 선택하기</b>
+      <span>여러 장을 한 번에 고르세요 (PC는 끌어다 놓기도 돼요)</span>
+    </div>
+    <input type="file" id="file" accept="image/*" multiple class="hidden">
+  </div>
+
+  <div class="card">
+    <div class="tip" style="margin-bottom:4px">원본 사진은 <b>크기 | 화질 | 색 그대로</b> 두고, 4:5가 되도록 흰 여백만 붙여서 최고 화질 JPG로 저장해요.</div>
+    <div class="bar" id="bar"><i></i></div>
+    <div class="status" id="status">사진을 넣으면 바로 변환돼요. 사진은 이 기기 안에서만 처리되고 어디에도 올라가지 않아요.</div>
+  </div>
+
+  <div class="card">
+    <div class="btns">
+      <button class="btn hidden" id="shareBtn" disabled>사진첩에 전부 저장</button>
+      <button class="btn" id="zipBtn" disabled>전체 한 번에 저장 (ZIP)</button>
+      <button class="btn ghost" id="clearBtn" disabled>전체 지우기</button>
+    </div>
+    <div class="grid" id="grid" style="margin-top:14px"></div>
+  </div>
+
+  <div class="tip">
+    <b>저장 방법</b><br>
+    <b>폰:</b> "사진첩에 전부 저장"을 누르고, 뜨는 창에서 <b>"이미지 ○개 저장"</b>을 누르면 사진첩에 한 장씩 따로 들어가요.<br>
+    <b>PC:</b> "전체 한 번에 저장 (ZIP)"을 누르면 파일 하나로 받아요. 압축 풀면 끝이에요.<br>
+    한 장만 필요하면 사진 아래 <b>저장</b>을 누르세요.
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var IOS_MAX_PIXELS = 16000000; // 아이폰 사파리 캔버스 한도 아래로
+  var state = { items:[], busy:false, queue:[] };
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---- 다운로드 방식 준비 ----
+  var canShareFiles = false;
+  var share = { from:0, chunk:0 };   // chunk 0 = 전부 한 번에
+  try{
+    var probe = new File([new Blob(["x"],{type:"image/jpeg"})],"a.jpg",{type:"image/jpeg"});
+    canShareFiles = !!(navigator.canShare && navigator.canShare({files:[probe]}));
+  }catch(e){}
+  var isTouch = (navigator.maxTouchPoints||0) > 0 && /iP(hone|ad|od)|Android|Macintosh/.test(navigator.userAgent);
+  var useShare = canShareFiles && isTouch;
+
+  // ---- 파일 입력 ----
+  var drop = $("drop"), input = $("file");
+  drop.addEventListener("click", function(){ input.click(); });
+  input.addEventListener("change", function(){ addFiles(input.files); input.value=""; });
+  ["dragenter","dragover"].forEach(function(t){ drop.addEventListener(t,function(e){e.preventDefault();drop.classList.add("over");}); });
+  ["dragleave","drop"].forEach(function(t){ drop.addEventListener(t,function(e){e.preventDefault();drop.classList.remove("over");}); });
+  drop.addEventListener("drop", function(e){ if(e.dataTransfer) addFiles(e.dataTransfer.files); });
+
+  var uid = 0;
+  function addFiles(list){
+    var arr = Array.prototype.slice.call(list||[]).filter(function(f){
+      return /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif|tiff?)$/i.test(f.name);
+    });
+    arr.forEach(function(f){
+      var it = { id:++uid, file:f, name:outName(f.name), blob:null, url:null, err:null, el:null };
+      state.items.push(it);
+      renderItem(it);
+      state.queue.push(it);
+    });
+    share.from = 0;
+    refresh();
+    pump();
+  }
+  function outName(n){
+    var base = n.replace(/\.[^.]+$/,"") || "photo";
+    return base + "_4x5.jpg";
+  }
+
+  // ---- 변환 ----
+  function loadImage(file){
+    return new Promise(function(res, rej){
+      var u = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){ res({img:img, url:u}); };
+      img.onerror = function(){ URL.revokeObjectURL(u); rej(new Error("이 형식은 이 기기에서 열 수 없어요")); };
+      img.src = u;
+    });
+  }
+  var isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+  // 4:5 캔버스: 사진의 긴 쪽이 캔버스에 딱 맞고, 나머지는 흰 여백. 사진 픽셀은 1:1 그대로.
+  function canvasSize(iw, ih){
+    if (iw*5 >= ih*4){ return {W:iw, H:Math.round(iw*5/4)}; }   // 가로 사진 또는 4:5보다 넓은 사진
+    return {W:Math.round(ih*4/5), H:ih};                         // 4:5보다 더 긴 세로 사진
+  }
+  function render(img){
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var t = canvasSize(iw, ih), W = t.W, H = t.H;
+    if (isIOS && W*H > IOS_MAX_PIXELS){
+      return Promise.reject(new Error("폰에서 처리하기엔 너무 큰 사진이에요 ("+iw+"×"+ih+"). PC에서 해주세요"));
+    }
+    // 여백 경계를 JPG 블록(16px)에 맞춰서 사진 가장자리가 번지지 않게 (가운데에서 최대 8px 차이)
+    var dx = Math.floor((W-iw)/2), dy = Math.floor((H-ih)/2);
+    if (dx >= 16) dx = Math.round(dx/16)*16;
+    if (dy >= 16) dy = Math.round(dy/16)*16;
+    var c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var g = c.getContext("2d");
+    if (!g){ return Promise.reject(new Error("이 기기에서 처리하기엔 너무 큰 사진이에요. PC에서 해주세요")); }
+    g.fillStyle = "#ffffff";
+    g.fillRect(0,0,W,H);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, dx, dy);          // 확대 | 축소 없이 원본 크기 그대로
+    // 미리보기용 작은 그림 (저장 파일과는 별개)
+    var tw = 260, th = Math.round(tw*H/W);
+    var tc = document.createElement("canvas"); tc.width = tw; tc.height = th;
+    var tg = tc.getContext("2d"); tg.imageSmoothingQuality = "high"; tg.drawImage(c,0,0,tw,th);
+    return new Promise(function(res, rej){
+      c.toBlob(function(b){
+        c.width = 0; c.height = 0;
+        if (!b){ tc.width = 0; rej(new Error("이 기기에서 처리하기엔 너무 큰 사진이에요. PC에서 해주세요")); return; }
+        tc.toBlob(function(tb){ tc.width = 0; res({blob:b, thumb:tb, W:W, H:H, iw:iw, ih:ih}); }, "image/jpeg", 0.8);
+      }, "image/jpeg", 1.0);   // 최고 화질
+    });
+  }
+  function processOne(it){
+    var loaded;
+    return loadImage(it.file).then(function(r){ loaded = r; return render(r.img); })
+      .then(function(out){
+        URL.revokeObjectURL(loaded.url);
+        if (it.url) URL.revokeObjectURL(it.url);
+        it.blob = out.blob; it.err = null; it.W = out.W; it.H = out.H; it.iw = out.iw; it.ih = out.ih;
+        it.url = URL.createObjectURL(out.thumb);
+      })
+      .catch(function(e){
+        if (loaded) URL.revokeObjectURL(loaded.url);
+        it.err = e.message || "변환 실패"; it.blob = null;
+      })
+      .then(function(){ renderItem(it); });
+  }
+  function pump(){
+    if (state.busy) return;
+    var next = state.queue.shift();
+    if (!next){ refresh(); return; }
+    if (state.items.indexOf(next) < 0){ pump(); return; }
+    state.busy = true; refresh();
+    processOne(next).then(function(){ state.busy = false; refresh(); setTimeout(pump, 0); });
+  }
+  // ---- 화면 ----
+  function renderItem(it){
+    var grid = $("grid");
+    if (!it.el){
+      it.el = document.createElement("div");
+      it.el.className = "item";
+      grid.appendChild(it.el);
+    }
+    var el = it.el;
+    el.classList.toggle("err", !!it.err);
+    var pv;
+    if (it.err) pv = '<div class="pv">'+esc(it.file.name)+'<br>'+esc(it.err)+'</div>';
+    else if (it.blob) pv = '<div class="pv"><img alt="" src="'+it.url+'"></div>';
+    else pv = '<div class="pv"><div class="spin"></div></div>';
+    el.innerHTML = pv +
+      '<div class="meta"><span>'+esc(it.name)+'</span>'+(it.blob?'<button class="save">저장</button>':'')+'</div>'+
+      '<button class="x" aria-label="삭제">×</button>';
+    el.querySelector(".x").onclick = function(){ removeItem(it); };
+    var sb = el.querySelector(".save");
+    if (sb) sb.onclick = function(){ saveOne(it); };
+  }
+  function removeItem(it){
+    var i = state.items.indexOf(it); if (i<0) return;
+    state.items.splice(i,1);
+    if (it.url) URL.revokeObjectURL(it.url);
+    if (it.el) it.el.remove();
+    refresh();
+  }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+  function refresh(){
+    var total = state.items.length;
+    var done = state.items.filter(function(i){return i.blob;}).length;
+    var errs = state.items.filter(function(i){return i.err;}).length;
+    var working = total - done - errs;
+    $("count").textContent = total ? (done+" / "+total+"장") : "";
+    $("zipBtn").disabled = working>0 || done===0;
+    $("clearBtn").disabled = total===0;
+    var sh = $("shareBtn");
+    sh.classList.toggle("hidden", !useShare);
+    $("zipBtn").classList.toggle("ghost", useShare);
+    sh.disabled = working>0 || done===0;
+    if (useShare) sh.textContent = shareLabel(done);
+    var bar = $("bar");
+    if (working>0){
+      bar.style.display="block";
+      bar.firstElementChild.style.width = Math.round((done+errs)/total*100)+"%";
+      setStatus("변환 중이에요... "+(done+errs)+" / "+total);
+    } else {
+      bar.style.display="none";
+      if (total) setStatus(done+"장 준비 완료"+(errs?" | "+errs+"장은 열 수 없는 형식이에요":"")+". 아래 버튼으로 저장하세요.");
+    }
+  }
+  function setStatus(t, color){ var s=$("status"); s.textContent=t; s.style.color=color||""; }
+
+  $("clearBtn").onclick = function(){
+    state.items.slice().forEach(removeItem);
+    state.queue = []; share.from = 0; share.chunk = 0;
+    setStatus("비웠어요. 새 사진을 넣어주세요.");
+  };
+
+  // ---- 저장 ----
+  function deliver(filename, blob){
+    var a = document.createElement("a");
+    var u = URL.createObjectURL(blob);
+    a.href = u; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(u); }, 30000);
+    return Promise.resolve(true);
+  }
+  function saveOne(it){
+    if (useShare){
+      navigator.share({files:[new File([it.blob], it.name, {type:"image/jpeg"})]}).then(function(){
+        setStatus(it.name+" 저장했어요.", "var(--ok)");
+      }).catch(function(e){ if (!e || e.name!=="AbortError") setStatus("저장이 안 됐어요. 다시 눌러주세요.", "var(--err)"); });
+      return;
+    }
+    deliver(it.name, it.blob).then(function(ok){
+      if (ok) setStatus(it.name+" 저장했어요.", "var(--ok)");
+    }).catch(function(){ setStatus("이 화면에서는 바로 저장이 안 돼요. 사진을 길게 눌러 저장해주세요.", "var(--err)"); });
+  }
+  $("zipBtn").onclick = function(){
+    var ready = state.items.filter(function(i){return i.blob;});
+    if (!ready.length) return;
+    setStatus("ZIP 만드는 중...");
+    makeZip(ready).then(function(zip){
+      var d = new Date();
+      var name = "TAKEMIND_4x5_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+"_"+pad2(d.getHours())+pad2(d.getMinutes())+".zip";
+      return deliver(name, zip).then(function(ok){
+        if (ok) setStatus(ready.length+"장을 ZIP 하나로 저장했어요.", "var(--ok)");
+        else setStatus("저장을 취소했어요.");
+      });
+    }).catch(function(){ setStatus("저장에 실패했어요. 다시 눌러주세요.", "var(--err)"); });
+  };
+  function readyItems(){ return state.items.filter(function(i){return i.blob;}); }
+  function shareLabel(done){
+    if (!share.chunk || done <= share.chunk) return "사진첩에 전부 저장";
+    var from = Math.min(share.from, done), to = Math.min(from+share.chunk, done);
+    if (from >= done) return "사진첩에 처음부터 다시 저장";
+    return "사진첩에 저장 ("+(from+1)+"~"+to+"번째)";
+  }
+  $("shareBtn").onclick = function(){
+    var ready = readyItems();
+    if (share.from >= ready.length) share.from = 0;
+    var part = share.chunk ? ready.slice(share.from, share.from+share.chunk) : ready;
+    var files = part.map(function(i){ return new File([i.blob], i.name, {type:"image/jpeg"}); });
+    navigator.share({files:files}).then(function(){
+      if (share.chunk){
+        share.from += part.length;
+        if (share.from >= ready.length){ setStatus("전부 "+ready.length+"장 저장했어요.", "var(--ok)"); share.from = ready.length; }
+        else setStatus(share.from+"장까지 저장했어요. 버튼을 한 번 더 눌러 다음 사진을 저장하세요.", "var(--ok)");
+      } else {
+        setStatus(ready.length+"장 저장했어요.", "var(--ok)");
+      }
+      refresh2();
+    }).catch(function(e){
+      if (e && e.name === "AbortError"){ setStatus("저장을 취소했어요."); return; }
+      if (!share.chunk && ready.length > 20){
+        share.chunk = 20; share.from = 0;
+        setStatus("폰이 한 번에 받기엔 사진이 많아요. 20장씩 나눠서 저장할게요. 버튼을 다시 눌러주세요.", "var(--err)");
+      } else {
+        setStatus("저장이 안 됐어요. 다시 눌러주세요.", "var(--err)");
+      }
+      refresh2();
+    });
+  };
+  function refresh2(){ $("shareBtn").textContent = shareLabel(readyItems().length); }
+  function pad2(n){ return (n<10?"0":"")+n; }
+
+  // ---- ZIP (압축 없이 묶기, 한글 파일명 지원) ----
+  var CRC = (function(){ var t=new Uint32Array(256); for(var n=0;n<256;n++){ var c=n; for(var k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+  function crc32(u8){ var c=0xFFFFFFFF; for(var i=0;i<u8.length;i++) c = CRC[(c^u8[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+  function readBuf(blob){
+    if (blob.arrayBuffer) return blob.arrayBuffer();
+    return new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=rej; r.readAsArrayBuffer(blob); });
+  }
+  function makeZip(items){
+    var enc = new TextEncoder();
+    var used = {};
+    var parts = [], central = [], offset = 0;
+    var d = new Date();
+    var dosTime = (d.getHours()<<11)|(d.getMinutes()<<5)|(Math.floor(d.getSeconds()/2));
+    var dosDate = ((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+    var chain = Promise.resolve();
+    items.forEach(function(it){
+      chain = chain.then(function(){ return readBuf(it.blob); }).then(function(ab){
+        var data = new Uint8Array(ab);
+        var nm = it.name, k = 2;
+        while (used[nm]) { nm = it.name.replace(/_4x5\.jpg$/, "_4x5("+(k++)+").jpg"); }
+        used[nm] = 1;
+        var nb = enc.encode(nm), crc = crc32(data), sz = data.length;
+        var h = new DataView(new ArrayBuffer(30));
+        h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint16(8,0,true);
+        h.setUint16(10,dosTime,true); h.setUint16(12,dosDate,true); h.setUint32(14,crc,true);
+        h.setUint32(18,sz,true); h.setUint32(22,sz,true); h.setUint16(26,nb.length,true); h.setUint16(28,0,true);
+        parts.push(h.buffer, nb, it.blob); data = null;
+        var c = new DataView(new ArrayBuffer(46));
+        c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true);
+        c.setUint16(10,0,true); c.setUint16(12,dosTime,true); c.setUint16(14,dosDate,true); c.setUint32(16,crc,true);
+        c.setUint32(20,sz,true); c.setUint32(24,sz,true); c.setUint16(28,nb.length,true);
+        c.setUint16(30,0,true); c.setUint16(32,0,true); c.setUint16(34,0,true); c.setUint16(36,0,true);
+        c.setUint32(38,0,true); c.setUint32(42,offset,true);
+        central.push(c.buffer, nb);
+        offset += 30 + nb.length + sz;
+      });
+    });
+    return chain.then(function(){
+      var cdSize = central.reduce(function(s,p){ return s + (p.byteLength); }, 0);
+      var e = new DataView(new ArrayBuffer(22));
+      e.setUint32(0,0x06054b50,true); e.setUint16(4,0,true); e.setUint16(6,0,true);
+      e.setUint16(8,items.length,true); e.setUint16(10,items.length,true);
+      e.setUint32(12,cdSize,true); e.setUint32(16,offset,true); e.setUint16(20,0,true);
+      return new Blob(parts.concat(central,[e.buffer]), {type:"application/zip"});
+    });
+  }
+
+  // 테스트용 노출
+  window.__f45 = { state:state, makeZip:makeZip, share:share };
+})();
+</script>
+</body>
+</html>
